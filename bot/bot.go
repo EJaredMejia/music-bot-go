@@ -32,15 +32,18 @@ func Run(queues queue.DynamicQueues) {
 	// add a event handler
 	discord.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		newMessage(newMessageParams{
-			discord: s,
-			message: m,
 			queues:  queues,
+			message: m,
+			discord: s,
 		})
 	})
 
 	// open session
 	discord.Open()
-	defer discord.Close() // close session, after function termination
+	defer func() {
+		discord.Close()
+		os.RemoveAll("audio")
+	}() // close session, after function termination
 
 	// keep bot running untill there is NO os interruption (ctrl + C)
 	fmt.Println("Bot running....")
@@ -69,10 +72,9 @@ func newMessage(params newMessageParams) {
 		return
 	}
 
-	discord.ChannelTyping(discordMessage.ChannelID)
 	action, message := splitActionMessage(discordMessage.Content)
 	switch {
-	case isCommand(action, "br"):
+	case isCommand(discord, discordMessage, action, "br"):
 
 		vc, err := joinVoiceChannel(discord, discordMessage)
 
@@ -81,7 +83,16 @@ func newMessage(params newMessageParams) {
 		}
 
 		queue := queue.GetQueue(queues, vc.ChannelID)
-		ytldp.ExtractAudio(queue, vc, message)
+
+		params := ytldp.ExtractAudioParams{
+			Queue:          queue,
+			TextMessage:    message,
+			Discord:        discord,
+			DiscordMessage: discordMessage,
+			DiscordVc:      vc,
+		}
+
+		ytldp.ExtractAudio(params)
 
 	}
 
@@ -106,8 +117,14 @@ func joinVoiceChannel(discord *discordgo.Session, m *discordgo.MessageCreate) (*
 	return vc, err
 }
 
-func isCommand(message string, action string) bool {
-	return strings.Contains(message, PREFIX+action)
+func isCommand(discord *discordgo.Session, m *discordgo.MessageCreate, message string, action string) bool {
+	hasCommand := strings.Contains(message, PREFIX+action)
+
+	if hasCommand {
+		discord.ChannelTyping(m.ChannelID)
+	}
+
+	return hasCommand
 }
 
 func splitActionMessage(content string) (string, string) {
@@ -118,3 +135,5 @@ func splitActionMessage(content string) (string, string) {
 
 	return action, message
 }
+
+// !p song -max=download

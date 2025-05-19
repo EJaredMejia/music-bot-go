@@ -1,8 +1,9 @@
 package queue
 
 import (
-	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
@@ -32,8 +33,9 @@ func GetQueue(queues DynamicQueues, id string) *Queue {
 // Queue is a struct that represents a queue data structure.
 // It uses a slice to store the elements and a mutex for concurrent access.
 type Queue struct {
-	elements []goYtldp.ProgressUpdate
-	mu       sync.Mutex
+	elements      []goYtldp.ProgressUpdate
+	mu            sync.Mutex
+	audioStreamMu sync.Mutex
 }
 
 func NewQueue() *Queue {
@@ -44,7 +46,6 @@ func NewQueue() *Queue {
 
 func (q *Queue) Enqueue(value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
 	q.mu.Lock()
-	log.Println("ADDED QUEUE: ", value)
 
 	q.elements = append(q.elements, value)
 	q.mu.Unlock()
@@ -53,12 +54,17 @@ func (q *Queue) Enqueue(value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnect
 }
 
 func streamAudio(q *Queue, value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
-	// TODO on enqueue stream audio
-	log.Println("PLAY AUDIO")
+	q.audioStreamMu.Lock()
 	dgvoice.PlayAudioFile(vc, value.Filename, make(<-chan bool))
-	log.Println("END PLAY AUDIO")
-	// streamaudio.PlayAudio(vc, value.Filename)
+	q.audioStreamMu.Unlock()
+
 	q.Dequeue()
+}
+
+func getTempFilename(filename string) string {
+	ext := filepath.Ext(filename)
+	nameWithoutExt := strings.TrimSuffix(filename, ext)
+	return nameWithoutExt + ".temp" + ext
 }
 
 func (q *Queue) Dequeue() {
@@ -71,7 +77,9 @@ func (q *Queue) Dequeue() {
 	element := q.elements[0]
 	q.elements = q.elements[1:]
 	go func() {
+		tempFilename := getTempFilename(element.Filename)
 		os.Remove(element.Filename)
+		os.Remove(tempFilename)
 	}()
 
 	return

@@ -2,6 +2,7 @@ package ytldp
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -10,25 +11,51 @@ import (
 	"github.com/music-formatter/queue"
 )
 
-func ExtractAudio(queue *queue.Queue, vc *discordgo.VoiceConnection, song string) {
+type ExtractAudioParams struct {
+	Queue          *queue.Queue
+	Discord        *discordgo.Session
+	DiscordMessage *discordgo.MessageCreate
+	DiscordVc      *discordgo.VoiceConnection
+	TextMessage    string
+}
+
+func ExtractAudio(params ExtractAudioParams) {
+
+	discord := params.Discord
+	discordMessage := params.DiscordMessage
+	vc := params.DiscordVc
+	queue := params.Queue
+	song := params.TextMessage
+
 	goYtldp.MustInstall(context.TODO(), nil)
 
+	audioDirectory := fmt.Sprintf("audio/%s", vc.ChannelID)
 	log.Println("Extracting audio")
 	dl := goYtldp.
 		New().
 		FormatSort("res,aext").
 		ExtractAudio().
+		// TODO max download param
+		MaxDownloads(25).
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
-			isDone := progress.Status.IsCompletedType()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println("ERROR: ", r)
+					discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("Error: %w", r))
+				}
+			}()
 
-			if isDone {
-				queue.Enqueue(progress, vc)
+			if !progress.Status.IsCompletedType() {
+				return
 			}
+
+			log.Println("DONE")
+			discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("now playing: %s", *progress.Info.Title))
+			queue.Enqueue(progress, vc)
+
 		}).
 		DefaultSearch("ytsearch").
-		// DumpJSON()
-		// TODO unique identifier for request
-		Output("audio/%(playlist_index)s - %(extractor)s - %(title)s.%(ext)s")
+		Output(audioDirectory + "/%(playlist_index)s - %(extractor)s - %(title)s.%(ext)s")
 
 	// I could add a file so it is detected so i can remove the watcher??
 	// https://www.youtube.com/watch?v=ftaXMKV3ffE
@@ -39,10 +66,7 @@ func ExtractAudio(queue *queue.Queue, vc *discordgo.VoiceConnection, song string
 	// url := "https://www.youtube.com/watch?v=fI-mnYR-Mp8&list=RDgsbZ3KX2CR8&index=27"
 
 	res, err := dl.Run(context.TODO(), song)
-	// info, err := res.GetExtractedInfo()
-	// // log.Println("INFO: ", info)
-	// j, _ := json.MarshalIndent(info, "", "    ")
-	// log.Println(string(j))
+
 	if err != nil {
 		log.Fatal(err)
 	}
