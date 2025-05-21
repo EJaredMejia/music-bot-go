@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,23 +39,27 @@ type Queue struct {
 	audioStreamMu sync.Mutex
 }
 
+type Queues Queue
+
 func NewQueue() *Queue {
 	return &Queue{
 		elements: make([]goYtldp.ProgressUpdate, 0),
 	}
 }
 
-func (q *Queue) Enqueue(value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
+func (q *Queue) Enqueue(discord *discordgo.Session, discordMessage *discordgo.MessageCreate, value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
 	q.mu.Lock()
 
 	q.elements = append(q.elements, value)
 	q.mu.Unlock()
 
-	go streamAudio(q, value, vc)
+	go streamAudio(q, discord, discordMessage, value, vc)
 }
 
-func streamAudio(q *Queue, value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
+func streamAudio(q *Queue, discord *discordgo.Session, discordMessage *discordgo.MessageCreate, value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
 	q.audioStreamMu.Lock()
+	discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("now playing: %s", *value.Info.Title))
+
 	dgvoice.PlayAudioFile(vc, value.Filename, make(<-chan bool))
 	q.audioStreamMu.Unlock()
 

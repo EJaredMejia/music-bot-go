@@ -17,6 +17,7 @@ type ExtractAudioParams struct {
 	DiscordMessage *discordgo.MessageCreate
 	DiscordVc      *discordgo.VoiceConnection
 	TextMessage    string
+	MaxSongs       int
 }
 
 func ExtractAudio(params ExtractAudioParams) {
@@ -29,18 +30,18 @@ func ExtractAudio(params ExtractAudioParams) {
 
 	goYtldp.MustInstall(context.TODO(), nil)
 
+	// todo see playlist end why crashes
 	audioDirectory := fmt.Sprintf("audio/%s", vc.ChannelID)
 	log.Println("Extracting audio")
 	dl := goYtldp.
 		New().
 		FormatSort("res,aext").
 		ExtractAudio().
-		// TODO max download param
-		MaxDownloads(25).
+		MaxDownloads(params.MaxSongs).
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Println("ERROR: ", r)
+					log.Println("ERROR defer ytld: ", r)
 					discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("Error: %w", r))
 				}
 			}()
@@ -50,8 +51,7 @@ func ExtractAudio(params ExtractAudioParams) {
 			}
 
 			log.Println("DONE")
-			discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("now playing: %s", *progress.Info.Title))
-			queue.Enqueue(progress, vc)
+			queue.Enqueue(discord, discordMessage, progress, vc)
 
 		}).
 		DefaultSearch("ytsearch").

@@ -5,15 +5,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"github.com/music-formatter/bot/commands"
+	"github.com/music-formatter/bot/utils"
 	"github.com/music-formatter/queue"
-	"github.com/music-formatter/ytldp"
 )
-
-const PREFIX = "!"
 
 func Run(queues queue.DynamicQueues) {
 
@@ -72,68 +70,18 @@ func newMessage(params newMessageParams) {
 		return
 	}
 
-	action, message := splitActionMessage(discordMessage.Content)
-	switch {
-	case isCommand(discord, discordMessage, action, "br"):
-
-		vc, err := joinVoiceChannel(discord, discordMessage)
-
-		if err != nil {
-			return
-		}
-
-		queue := queue.GetQueue(queues, vc.ChannelID)
-
-		params := ytldp.ExtractAudioParams{
-			Queue:          queue,
-			TextMessage:    message,
-			Discord:        discord,
-			DiscordMessage: discordMessage,
-			DiscordVc:      vc,
-		}
-
-		ytldp.ExtractAudio(params)
-
+	action, message, flags := utils.SplitActionMessage(discordMessage.Content)
+	commandParams := commands.CommandParams{
+		Queues:         queues,
+		TextMessage:    message,
+		Discord:        discord,
+		DiscordMessage: discordMessage,
+		Flags:          flags,
 	}
-
-}
-
-func joinVoiceChannel(discord *discordgo.Session, m *discordgo.MessageCreate) (*discordgo.VoiceConnection, error) {
-	voiceState, err := discord.State.VoiceState(m.GuildID, m.Author.ID)
-
-	if err != nil {
-		discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s is not on a voice channel", m.Author.Username))
-		return nil, err
+	switch utils.IsCommand(discord, discordMessage, action) {
+	case commands.BR:
+		commands.PlayCommand(commandParams)
+	default:
+		// TODO add invalid command
 	}
-
-	vc, err := discord.ChannelVoiceJoin(m.GuildID, voiceState.ChannelID, false, true)
-
-	if err != nil {
-		fmt.Println("Error joining voice channel:", err)
-		discord.ChannelMessageSend(m.ChannelID, "Failed to join the voice channel.")
-		return vc, err
-	}
-
-	return vc, err
 }
-
-func isCommand(discord *discordgo.Session, m *discordgo.MessageCreate, message string, action string) bool {
-	hasCommand := strings.Contains(message, PREFIX+action)
-
-	if hasCommand {
-		discord.ChannelTyping(m.ChannelID)
-	}
-
-	return hasCommand
-}
-
-func splitActionMessage(content string) (string, string) {
-	words := strings.Split(content, " ")
-
-	action := words[0]
-	message := strings.Join(words[1:], " ")
-
-	return action, message
-}
-
-// !p song -max=download
