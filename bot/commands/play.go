@@ -19,7 +19,7 @@ func PlayCommand(params CommandParams) {
 
 	queue := queue.GetQueue(params.Queues, vc.ChannelID)
 
-	maxSongs := playFlags(params.Flags)
+	flags := playFlags(params.Flags)
 
 	ytldp.ExtractAudio(ytldp.ExtractAudioParams{
 		Queue:          queue,
@@ -27,16 +27,20 @@ func PlayCommand(params CommandParams) {
 		Discord:        params.Discord,
 		DiscordMessage: params.DiscordMessage,
 		DiscordVc:      vc,
-		MaxSongs:       maxSongs,
+		Flags:          flags,
 	})
 }
 
-func playFlags(flags []string) int {
+func playFlags(flags []string) ytldp.PlayFlags {
 	fs := flag.NewFlagSet("command", flag.ContinueOnError)
 
 	maxSongs := fs.Int("max", DEFAULT_MAX_SONGS, "max number of songs")
+	random := fs.Bool("random", false, "play songs in random order")
 
 	fs.Parse(flags)
 
-	return *maxSongs
+	return ytldp.PlayFlags{
+		MaxSongs: *maxSongs,
+		Random:   *random,
+	}
 }

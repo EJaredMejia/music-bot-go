@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	BR = "br"
+	BR    = "br"
+	QUEUE = "queue"
 )
 
 type CommandParams struct {

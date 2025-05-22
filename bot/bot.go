@@ -39,8 +39,8 @@ func Run(queues queue.DynamicQueues) {
 	// open session
 	discord.Open()
 	defer func() {
-		discord.Close()
 		os.RemoveAll("audio")
+		discord.Close()
 	}() // close session, after function termination
 
 	// keep bot running untill there is NO os interruption (ctrl + C)
@@ -81,6 +81,8 @@ func newMessage(params newMessageParams) {
 	switch utils.IsCommand(discord, discordMessage, action) {
 	case commands.BR:
 		commands.PlayCommand(commandParams)
+	case commands.QUEUE:
+		commands.PrintQueue(commandParams)
 	default:
 		// TODO add invalid command
 	}

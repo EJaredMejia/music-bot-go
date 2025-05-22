@@ -2,6 +2,7 @@ package queue
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,4 +97,42 @@ func (q *Queue) IsEmpty() bool {
 
 func (q *Queue) Size() int {
 	return len(q.elements)
+}
+
+func (q *Queue) Print() string {
+	size := q.Size()
+	if size == 0 {
+		return "There is no song playing"
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Queue:\n")
+	for i, element := range q.elements {
+		isPlaying := i == 0
+
+		message := ""
+
+		if isPlaying {
+			message = "**Currently Playing:** "
+		}
+
+		duration := formatSecondsToMMSS(*element.Info.Duration)
+
+		sb.WriteString(fmt.Sprintf("%d. %s%s - `%s`\n", i+1, message, *element.Info.Title, duration))
+	}
+
+	return sb.String()
+}
+
+func formatSecondsToMMSS(totalSeconds float64) string {
+	// Ensure totalSeconds is non-negative
+	if totalSeconds < 0 {
+		totalSeconds = 0
+	}
+
+	// Calculate minutes and seconds
+	minutes := int(totalSeconds / 60)
+	seconds := int(math.Mod(totalSeconds, 60)) // Use math.Mod for float64
+
+	return fmt.Sprintf("%02d:%02d", minutes, seconds)
 }

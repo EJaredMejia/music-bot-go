@@ -11,13 +11,18 @@ import (
 	"github.com/music-formatter/queue"
 )
 
+type PlayFlags struct {
+	MaxSongs int
+	Random   bool
+}
+
 type ExtractAudioParams struct {
 	Queue          *queue.Queue
 	Discord        *discordgo.Session
 	DiscordMessage *discordgo.MessageCreate
 	DiscordVc      *discordgo.VoiceConnection
 	TextMessage    string
-	MaxSongs       int
+	Flags          PlayFlags
 }
 
 func ExtractAudio(params ExtractAudioParams) {
@@ -28,16 +33,16 @@ func ExtractAudio(params ExtractAudioParams) {
 	queue := params.Queue
 	song := params.TextMessage
 
-	goYtldp.MustInstall(context.TODO(), nil)
+	goYtldp.MustInstall(context.TODO(), &goYtldp.InstallOptions{
+		AllowVersionMismatch: true,
+	})
 
-	// todo see playlist end why crashes
 	audioDirectory := fmt.Sprintf("audio/%s", vc.ChannelID)
 	log.Println("Extracting audio")
 	dl := goYtldp.
 		New().
-		FormatSort("res,aext").
-		ExtractAudio().
-		MaxDownloads(params.MaxSongs).
+		Format("bestaudio").
+		MaxDownloads(params.Flags.MaxSongs).
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -57,6 +62,10 @@ func ExtractAudio(params ExtractAudioParams) {
 		DefaultSearch("ytsearch").
 		Output(audioDirectory + "/%(playlist_index)s - %(extractor)s - %(title)s.%(ext)s")
 
+	if params.Flags.Random {
+		dl = dl.PlaylistRandom()
+	}
+
 	// I could add a file so it is detected so i can remove the watcher??
 	// https://www.youtube.com/watch?v=ftaXMKV3ffE
 
@@ -68,7 +77,7 @@ func ExtractAudio(params ExtractAudioParams) {
 	res, err := dl.Run(context.TODO(), song)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Println("ERR:", err)
 	}
 
 	log.Println("RES: ", res)

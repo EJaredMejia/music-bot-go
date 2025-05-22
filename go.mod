@@ -7,9 +7,8 @@ toolchain go1.24.3
 require (
 	github.com/bwmarrin/dgvoice v0.0.0-20210225172318-caaac756e02e
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/joho/godotenv v1.5.1
-	github.com/lrstanley/go-ytdlp v0.0.0-20250501010938-80d02fe36936
+	github.com/lrstanley/go-ytdlp v0.0.0-20250522151933-92513d6ff802
 )
 
 require (
