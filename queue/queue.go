@@ -102,7 +102,7 @@ func (q *Queue) Size() int {
 func (q *Queue) Print() string {
 	size := q.Size()
 	if size == 0 {
-		return "There is no song playing"
+		return "Nothing playing right now!"
 	}
 
 	var sb strings.Builder

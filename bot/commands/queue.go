@@ -14,10 +14,5 @@ func PrintQueue(params CommandParams) {
 
 	queue := queue.GetQueue(params.Queues, vc.ChannelID)
 
-	if queue.IsEmpty() {
-		params.Discord.ChannelMessageSend(params.DiscordMessage.ChannelID, "Queue is empty")
-		return
-	}
-
 	params.Discord.ChannelMessageSend(params.DiscordMessage.ChannelID, queue.Print())
 }
