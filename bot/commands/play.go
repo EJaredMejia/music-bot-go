@@ -8,8 +8,6 @@ import (
 	"github.com/music-formatter/ytldp"
 )
 
-const DEFAULT_MAX_SONGS = 25
-
 func PlayCommand(params CommandParams) {
 	vc, err := utils.JoinVoiceChannel(params.Discord, params.DiscordMessage)
 
@@ -34,7 +32,7 @@ func PlayCommand(params CommandParams) {
 func playFlags(flags []string) ytldp.PlayFlags {
 	fs := flag.NewFlagSet("command", flag.ContinueOnError)
 
-	maxSongs := fs.Int("max", DEFAULT_MAX_SONGS, "max number of songs")
+	maxSongs := fs.Int("max", 0, "max number of songs")
 	random := fs.Bool("random", false, "play songs in random order")
 
 	fs.Parse(flags)

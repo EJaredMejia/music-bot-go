@@ -18,16 +18,29 @@ func IsCommand(discord *discordgo.Session, m *discordgo.MessageCreate, action st
 
 	command := action[1:]
 
+	fmt.Print(command)
+
 	return command
 }
 
-func JoinVoiceChannel(discord *discordgo.Session, m *discordgo.MessageCreate) (*discordgo.VoiceConnection, error) {
+func GetVoiceState(discord *discordgo.Session, m *discordgo.MessageCreate) (*discordgo.VoiceState, error) {
 	discord.ChannelTyping(m.ChannelID)
 
 	voiceState, err := discord.State.VoiceState(m.GuildID, m.Author.ID)
 
 	if err != nil {
 		discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s is not on a voice channel", m.Author.Username))
+		return voiceState, err
+	}
+
+	return voiceState, nil
+}
+
+func JoinVoiceChannel(discord *discordgo.Session, m *discordgo.MessageCreate) (*discordgo.VoiceConnection, error) {
+
+	voiceState, err := GetVoiceState(discord, m)
+
+	if err != nil {
 		return nil, err
 	}
 

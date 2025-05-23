@@ -2,6 +2,7 @@ package queue
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -10,8 +11,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	goYtldp "github.com/lrstanley/go-ytdlp"
-
-	"github.com/bwmarrin/dgvoice"
+	"github.com/music-formatter/dgvoice"
 )
 
 type DynamicQueues map[string]*Queue
@@ -35,16 +35,20 @@ func GetQueue(queues DynamicQueues, id string) *Queue {
 // Queue is a struct that represents a queue data structure.
 // It uses a slice to store the elements and a mutex for concurrent access.
 type Queue struct {
-	elements      []goYtldp.ProgressUpdate
-	mu            sync.Mutex
-	audioStreamMu sync.Mutex
+	elements         []goYtldp.ProgressUpdate
+	mu               sync.Mutex
+	audioStreamMu    sync.Mutex
+	audioStopChannel chan bool
+	doneChannel      chan bool
 }
 
 type Queues Queue
 
 func NewQueue() *Queue {
 	return &Queue{
-		elements: make([]goYtldp.ProgressUpdate, 0),
+		elements:         make([]goYtldp.ProgressUpdate, 0),
+		audioStopChannel: make(chan bool),
+		doneChannel:      make(chan bool),
 	}
 }
 
@@ -59,12 +63,15 @@ func (q *Queue) Enqueue(discord *discordgo.Session, discordMessage *discordgo.Me
 
 func streamAudio(q *Queue, discord *discordgo.Session, discordMessage *discordgo.MessageCreate, value goYtldp.ProgressUpdate, vc *discordgo.VoiceConnection) {
 	q.audioStreamMu.Lock()
+
 	discord.ChannelMessageSend(discordMessage.ChannelID, fmt.Sprintf("now playing: %s", *value.Info.Title))
 
-	dgvoice.PlayAudioFile(vc, value.Filename, make(<-chan bool))
-	q.audioStreamMu.Unlock()
+	defer func() {
+		q.audioStreamMu.Unlock()
+		q.Dequeue()
+	}()
 
-	q.Dequeue()
+	dgvoice.PlayAudioFile(vc, value.Filename, q.audioStopChannel, q.doneChannel)
 }
 
 func getTempFilename(filename string) string {
@@ -82,13 +89,16 @@ func (q *Queue) Dequeue() {
 
 	element := q.elements[0]
 	q.elements = q.elements[1:]
-	go func() {
-		tempFilename := getTempFilename(element.Filename)
-		os.Remove(element.Filename)
-		os.Remove(tempFilename)
-	}()
+	go removeAudioFile(element)
 
 	return
+}
+
+func removeAudioFile(element goYtldp.ProgressUpdate) {
+	tempFilename := getTempFilename(element.Filename)
+	os.Remove(element.Filename)
+	os.Remove(tempFilename)
+
 }
 
 func (q *Queue) IsEmpty() bool {
@@ -97,6 +107,24 @@ func (q *Queue) IsEmpty() bool {
 
 func (q *Queue) Size() int {
 	return len(q.elements)
+}
+
+func (q *Queue) Clear(vc *discordgo.VoiceConnection) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.audioStopChannel <- true
+
+	go func() {
+		<-q.doneChannel
+		path := fmt.Sprintf("audio/%s", vc.ChannelID)
+		err := os.RemoveAll(path)
+		if err != nil {
+			log.Println("ERROR FILE", err)
+		}
+	}()
+
+	q.elements = make([]goYtldp.ProgressUpdate, 0)
 }
 
 func (q *Queue) Print() string {

@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	goYtldp "github.com/lrstanley/go-ytdlp"
 	"github.com/music-formatter/queue"
 )
+
+const DEFAULT_URL_MAX_SONGS = 25
+const DEFAULT_TEXT_MAX_SONGS = 1
 
 type PlayFlags struct {
 	MaxSongs int
@@ -25,6 +29,11 @@ type ExtractAudioParams struct {
 	Flags          PlayFlags
 }
 
+func isURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && u.Scheme != "" && u.Host != ""
+}
+
 func ExtractAudio(params ExtractAudioParams) {
 
 	discord := params.Discord
@@ -37,12 +46,13 @@ func ExtractAudio(params ExtractAudioParams) {
 		AllowVersionMismatch: true,
 	})
 
+	isSongUrl := isURL(song)
+
 	audioDirectory := fmt.Sprintf("audio/%s", vc.ChannelID)
 	log.Println("Extracting audio")
 	dl := goYtldp.
 		New().
 		Format("bestaudio").
-		MaxDownloads(params.Flags.MaxSongs).
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -65,6 +75,24 @@ func ExtractAudio(params ExtractAudioParams) {
 	if params.Flags.Random {
 		dl = dl.PlaylistRandom()
 	}
+
+	maxSongs := func() int {
+
+		maxSongs := params.Flags.MaxSongs
+		isDefaultMaxSongs := maxSongs == 0
+
+		if !isDefaultMaxSongs {
+			return maxSongs
+		}
+
+		if isSongUrl {
+			return DEFAULT_URL_MAX_SONGS
+		}
+
+		return DEFAULT_TEXT_MAX_SONGS
+	}()
+
+	dl = dl.MaxDownloads(maxSongs)
 
 	// I could add a file so it is detected so i can remove the watcher??
 	// https://www.youtube.com/watch?v=ftaXMKV3ffE

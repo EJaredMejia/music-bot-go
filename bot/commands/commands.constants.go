@@ -8,6 +8,8 @@ import (
 const (
 	BR    = "br"
 	QUEUE = "queue"
+	// TODO change to leave
+	LEAVE = "brleave"
 )
 
 type CommandParams struct {

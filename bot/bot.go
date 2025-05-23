@@ -83,6 +83,8 @@ func newMessage(params newMessageParams) {
 		commands.PlayCommand(commandParams)
 	case commands.QUEUE:
 		commands.PrintQueue(commandParams)
+	case commands.LEAVE:
+		commands.LeaveCommand(commandParams)
 	default:
 		// TODO add invalid command
 	}
