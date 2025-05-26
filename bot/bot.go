@@ -85,7 +85,9 @@ func newMessage(params newMessageParams) {
 		commands.PrintQueue(commandParams)
 	case commands.LEAVE:
 		commands.LeaveCommand(commandParams)
+	case commands.SKIP:
+		commands.SkipCommand(commandParams)
 	default:
-		// TODO add invalid command
+		discord.ChannelMessageSend(discordMessage.ChannelID, "Invalid command")
 	}
 }

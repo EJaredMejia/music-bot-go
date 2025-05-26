@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -18,7 +19,7 @@ func IsCommand(discord *discordgo.Session, m *discordgo.MessageCreate, action st
 
 	command := action[1:]
 
-	fmt.Print(command)
+	log.Println("COMMAND: ", command)
 
 	return command
 }
@@ -74,7 +75,7 @@ func SplitActionMessage(input string) (string, string, []string) {
 		messageBuilder.WriteString(word + " ")
 	}
 
-	fmt.Println("MESSAGE:", messageBuilder.String())
+	log.Println("MESSAGE:", messageBuilder.String())
 
 	return action, messageBuilder.String(), flags
 }

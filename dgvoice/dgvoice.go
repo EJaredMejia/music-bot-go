@@ -13,7 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
+	"log"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -46,10 +46,11 @@ var OnError = func(str string, err error) {
 	prefix := "dgVoice: " + str
 
 	if err != nil {
-		os.Stderr.WriteString(prefix + ": " + err.Error())
-	} else {
-		os.Stderr.WriteString(prefix)
+		log.Println(prefix + ": " + err.Error())
+		return
 	}
+
+	log.Println(prefix)
 }
 
 // SendPCM will receive on the provied channel encode
@@ -145,6 +146,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 	// Create a shell command "object" to run.
 	run := exec.Command("ffmpeg", "-i", filename, "-f", "s16le", "-ar", strconv.Itoa(frameRate), "-ac", strconv.Itoa(channels), "pipe:1")
 	ffmpegout, err := run.StdoutPipe()
+
 	if err != nil {
 		OnError("StdoutPipe Error", err)
 		return
@@ -161,11 +163,9 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 
 	// prevent memory leak from residual ffmpeg streams
 	defer func() {
+		ffmpegout.Close()
 		run.Process.Kill()
-		go func() {
-			run.Wait()
-			done <- true
-		}()
+		done <- true
 	}()
 
 	// Send "speaking" packet over the voice websocket
@@ -193,6 +193,7 @@ func PlayAudioFile(v *discordgo.VoiceConnection, filename string, stop <-chan bo
 	}()
 
 	for {
+
 		// read data from ffmpeg stdout
 		audiobuf := make([]int16, frameSize*channels)
 		err = binary.Read(ffmpegbuf, binary.LittleEndian, &audiobuf)

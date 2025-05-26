@@ -9,6 +9,7 @@ import (
 )
 
 func PlayCommand(params CommandParams) {
+
 	vc, err := utils.JoinVoiceChannel(params.Discord, params.DiscordMessage)
 
 	if err != nil {

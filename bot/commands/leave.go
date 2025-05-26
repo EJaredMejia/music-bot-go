@@ -25,9 +25,8 @@ func LeaveCommand(params CommandParams) {
 	// get the queue
 	queue := queue.GetQueue(params.Queues, vc.ChannelID)
 
-	// TODO fix leave is not leaving and not clearing
 	// clear the queue
-	queue.Clear(vc)
-	// vc.Disconnect()
+	queue.Clear(params.Queues, vc)
 
+	vc.Disconnect()
 }

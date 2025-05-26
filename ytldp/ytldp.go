@@ -2,6 +2,7 @@ package ytldp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -14,6 +15,8 @@ import (
 
 const DEFAULT_URL_MAX_SONGS = 25
 const DEFAULT_TEXT_MAX_SONGS = 1
+
+var CANCELLED_ERROR = errors.New("Cancelled by context")
 
 type PlayFlags struct {
 	MaxSongs int
@@ -49,10 +52,14 @@ func ExtractAudio(params ExtractAudioParams) {
 	isSongUrl := isURL(song)
 
 	audioDirectory := fmt.Sprintf("audio/%s", vc.ChannelID)
+	// playlist skip -> song why cancel
+	// but leave should cancel everything
+
 	log.Println("Extracting audio")
 	dl := goYtldp.
 		New().
-		Format("bestaudio").
+		Format("bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio").
+		FormatSort("abr").
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -65,7 +72,7 @@ func ExtractAudio(params ExtractAudioParams) {
 				return
 			}
 
-			log.Println("DONE")
+			log.Println("DONE:", *progress.Info.Title)
 			queue.Enqueue(discord, discordMessage, progress, vc)
 
 		}).
@@ -94,20 +101,27 @@ func ExtractAudio(params ExtractAudioParams) {
 
 	dl = dl.MaxDownloads(maxSongs)
 
-	// I could add a file so it is detected so i can remove the watcher??
-	// https://www.youtube.com/watch?v=ftaXMKV3ffE
+	done := make(chan bool, 1)
 
-	// url := "https://www.youtube.com/watch?v=ftaXMKV3ffE"
-	// url := "olympian playboi carti"
+	go func() {
+		defer close(done)
+		res, err := dl.Run(queue.Context, song)
+		if err != nil {
+			log.Println("ERR:", err)
+		}
 
-	// url := "https://www.youtube.com/watch?v=fI-mnYR-Mp8&list=RDgsbZ3KX2CR8&index=27"
+		log.Println("RES: ", res)
+	}()
 
-	res, err := dl.Run(context.TODO(), song)
-
-	if err != nil {
-		log.Println("ERR:", err)
-	}
-
-	log.Println("RES: ", res)
+	func() {
+		select {
+		case <-queue.Context.Done():
+			log.Println("CANCELLED")
+			// panic(errors.New("Cancelled by context"))
+		case <-done:
+			return
+		}
+	}()
+	// done <- true
 
 }

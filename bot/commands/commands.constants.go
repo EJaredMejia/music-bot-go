@@ -10,6 +10,7 @@ const (
 	QUEUE = "queue"
 	// TODO change to leave
 	LEAVE = "brleave"
+	SKIP  = "brskip"
 )
 
 type CommandParams struct {

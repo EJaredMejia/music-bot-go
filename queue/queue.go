@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -40,15 +41,20 @@ type Queue struct {
 	audioStreamMu    sync.Mutex
 	audioStopChannel chan bool
 	doneChannel      chan bool
+	Context          context.Context
+	CancelCtx        context.CancelFunc
 }
 
-type Queues Queue
-
 func NewQueue() *Queue {
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &Queue{
 		elements:         make([]goYtldp.ProgressUpdate, 0),
 		audioStopChannel: make(chan bool),
 		doneChannel:      make(chan bool),
+		Context:          ctx,
+		CancelCtx:        cancel,
 	}
 }
 
@@ -68,6 +74,7 @@ func streamAudio(q *Queue, discord *discordgo.Session, discordMessage *discordgo
 
 	defer func() {
 		q.audioStreamMu.Unlock()
+		<-q.doneChannel
 		q.Dequeue()
 	}()
 
@@ -95,9 +102,11 @@ func (q *Queue) Dequeue() {
 }
 
 func removeAudioFile(element goYtldp.ProgressUpdate) {
-	tempFilename := getTempFilename(element.Filename)
-	os.Remove(element.Filename)
-	os.Remove(tempFilename)
+	err := os.Remove(element.Filename)
+
+	if err != nil {
+		log.Println("ERROR FILE", err)
+	}
 
 }
 
@@ -109,7 +118,7 @@ func (q *Queue) Size() int {
 	return len(q.elements)
 }
 
-func (q *Queue) Clear(vc *discordgo.VoiceConnection) {
+func (q *Queue) Clear(queues DynamicQueues, vc *discordgo.VoiceConnection) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -124,7 +133,8 @@ func (q *Queue) Clear(vc *discordgo.VoiceConnection) {
 		}
 	}()
 
-	q.elements = make([]goYtldp.ProgressUpdate, 0)
+	q.CancelCtx()
+	delete(queues, vc.ChannelID)
 }
 
 func (q *Queue) Print() string {
@@ -150,6 +160,17 @@ func (q *Queue) Print() string {
 	}
 
 	return sb.String()
+}
+
+func (q *Queue) Skip() goYtldp.ProgressUpdate {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	currentSong := q.elements[0]
+	// dequeue occurs in streamAudio
+	q.audioStopChannel <- true
+
+	return currentSong
 }
 
 func formatSecondsToMMSS(totalSeconds float64) string {
