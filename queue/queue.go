@@ -48,7 +48,6 @@ type Queue struct {
 func NewQueue() *Queue {
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Queue{
 		elements:         make([]goYtldp.ProgressUpdate, 0),
 		audioStopChannel: make(chan bool),

@@ -60,6 +60,7 @@ func ExtractAudio(params ExtractAudioParams) {
 		New().
 		Format("bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio").
 		FormatSort("abr").
+		Cookies("cookies.txt").
 		ProgressFunc(100*time.Millisecond, func(progress goYtldp.ProgressUpdate) {
 			defer func() {
 				if r := recover(); r != nil {
